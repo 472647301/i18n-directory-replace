@@ -1,0 +1,27 @@
+{
+  "name": "byron-directory-replace",
+  "version": "1.0.0",
+  "description": "byron-directory-replace",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/472647301/directory-replace.git"
+  },
+  "keywords": [
+    "byron-directory-replace"
+  ],
+  "author": "472647301@qq.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/472647301/directory-replace/issues"
+  },
+  "homepage": "https://github.com/472647301/directory-replace#readme",
+  "dependencies": {
+    "uuid": "^3.3.3"
+  }
+}
