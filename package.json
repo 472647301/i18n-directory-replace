@@ -2,6 +2,9 @@
   "name": "byron-directory-replace",
   "version": "1.0.0",
   "description": "byron-directory-replace",
+  "bin": {
+    "byron-directory-replace": "index.js"
+  },
   "directories": {
     "test": "test"
   },
@@ -22,6 +25,8 @@
   },
   "homepage": "https://github.com/472647301/directory-replace#readme",
   "dependencies": {
+    "commander": "^3.0.1",
+    "minimist": "^1.2.0",
     "uuid": "^3.3.3"
   }
 }

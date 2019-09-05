@@ -3,10 +3,11 @@ const path = require('path')
 const uuid = require('uuid/v1')
 
 // 中文正则
-const ZHCN = /[^\u4e00-\u9fa5\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\uff08|\uff09|\u300a|\u300b|\u3008|\u3009|\u3010|\u3011|\u300e|\u300f|\u300c|\u300d|\ufe43|\ufe44|\u3014|\u3015|\u2026|\u2014|\uff5e|\ufe4f|\uffe5]/g
+const ZHCN = /[^\u4e00-\u9fa5\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\u2019|\uff08|\uff09|\u300a|\u300b|\u3008|\u3009|\u3010|\u3011|\u300e|\u300f|\u300c|\u300d|\ufe43|\ufe44|\u3014|\u3015|\u2026|\u2014|\uff5e|\ufe4f|\uffe5]/g
 
 module.exports = class Byron {
   constructor() {
+    this.count = 0
     this.langPack = {} // 语言包对象
   }
 
@@ -70,7 +71,7 @@ module.exports = class Byron {
     const paragraph = []
     const arr = content.split('\n')
     arr.forEach(e => {
-      if (/\/\//.test(e) || /\/* .* *\//.test(e)) {
+      if (/\/\//.test(e) || /\/* .* *\//.test(e) || /console./.test(e)) {
         return
       }
       const lineArr = e.split(' ').filter(item => {
@@ -100,13 +101,10 @@ module.exports = class Byron {
    * 生成语言包
    */
   createLangPack() {
-    const file = path.join(process.cwd(), `zh_cn.json`)
-    fs.writeFile(file, JSON.stringify(this.langPack), function(err) {
-      if (err) {
-        return console.log(err)
-      }
-      console.log('生成语言包结束，输出文件路径：' + file)
-    })
+    const name = `${uuid().split('-')[0]}_zh_cn.json`
+    const file = path.join(process.cwd(), name)
+    fs.writeFileSync(file, JSON.stringify(this.langPack))
+    console.log('生成语言包结束，输出文件路径：' + file)
   }
 
   /**
@@ -114,56 +112,50 @@ module.exports = class Byron {
    * @param filePath 需要遍历的文件路径
    */
   directoryForEach(filePath) {
-    const forEachFile = filename => {
-      const filedir = path.join(filePath, filename)
-      fs.stat(filedir, (err, stats) => {
-        if (err) {
-          return console.log('获取文件信息失败', err)
-        }
-        this.fileStats(filedir, stats)
-      })
-    }
-    fs.readdir(filePath, (err, files) => {
-      if (err) {
-        return console.log(err)
+    const files = fs.readdirSync(filePath)
+    for (let file of files) {
+      const filedir = path.join(filePath, file)
+      const fileState = fs.statSync(filedir)
+      if (fileState.isDirectory()) {
+        this.fileRecursive(filedir)
+      } else {
+        this.fileStats(filedir)
       }
-      // 遍历读取到的文件列表
-      files.forEach(filename => {
-        forEachFile(filename)
-      })
-    })
+    }
+    this.createLangPack()
   }
 
-  fileStats(filedir, stats) {
-    const isFile = stats.isFile() // 是文件
-    const isDir = stats.isDirectory() // 是文件夹
+  fileRecursive(filePath) {
+    const files = fs.readdirSync(filePath)
+    for (let file of files) {
+      const filedir = path.join(filePath, file)
+      const fileState = fs.statSync(filedir)
+      if (fileState.isDirectory()) {
+        this.fileRecursive(filedir)
+      } else {
+        this.fileStats(filedir)
+      }
+    }
+  }
+
+  fileStats(filedir) {
     const isVue = filedir.indexOf('.vue') !== -1
     const isJS = filedir.indexOf('.js') !== -1
-    if ((isFile && isVue) || (isFile && isJS)) {
+    if (isVue || isJS) {
       this.fileBuffer(filedir)
-    }
-    if (isDir) {
-      // 递归，如果是文件夹，就继续遍历该文件夹下面的文件
-      this.directoryForEach(filedir)
     }
   }
 
   fileBuffer(filedir) {
-    fs.readFile(filedir, (err, data) => {
-      if (err) {
-        return console.log(`读取文件[${filedir}]失败！`)
-      }
+    const data = fs.readFileSync(filedir)
+    if (data) {
       const content = data.toString()
       this.fileReplace(filedir, this.replaceContent(content))
-    })
+    }
   }
 
   fileReplace(filedir, content) {
-    fs.writeFile(filedir, content, err => {
-      if (err) {
-        return console.log(`写入文件[${filedir}]失败！`)
-      }
-      console.log(`写入文件[${filedir}]成功！`)
-    })
+    fs.writeFileSync(filedir, content)
+    console.log(`替换文件[${filedir}]成功！`)
   }
 }
