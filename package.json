@@ -1,9 +1,9 @@
 {
-  "name": "byron-directory-replace",
+  "name": "i18n-directory-replace",
   "version": "1.0.0",
-  "description": "byron-directory-replace",
+  "description": "替换.vue/.js中的中文为多语言",
   "bin": {
-    "byron-directory-replace": "index.js"
+    "byron-i18n": "index.js"
   },
   "directories": {
     "test": "test"
@@ -13,20 +13,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/472647301/directory-replace.git"
+    "url": "git+https://github.com/472647301/i18n-directory-replace.git"
   },
   "keywords": [
-    "byron-directory-replace"
+    "i18n-directory-replace"
   ],
   "author": "472647301@qq.com",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/472647301/directory-replace/issues"
+    "url": "https://github.com/472647301/i18n-directory-replace/issues"
   },
-  "homepage": "https://github.com/472647301/directory-replace#readme",
+  "homepage": "https://github.com/472647301/i18n-directory-replace#readme",
   "dependencies": {
+    "colors": "^1.3.3",
     "commander": "^3.0.1",
-    "minimist": "^1.2.0",
-    "uuid": "^3.3.3"
+    "minimist": "^1.2.0"
   }
 }

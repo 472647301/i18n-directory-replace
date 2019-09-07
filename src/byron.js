@@ -1,161 +1,240 @@
 const fs = require('fs')
 const path = require('path')
-const uuid = require('uuid/v1')
+const colors = require('colors')
 
 // 中文正则
-const ZHCN = /[^\u4e00-\u9fa5\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\u2019|\uff08|\uff09|\u300a|\u300b|\u3008|\u3009|\u3010|\u3011|\u300e|\u300f|\u300c|\u300d|\ufe43|\ufe44|\u3014|\u3015|\u2026|\u2014|\uff5e|\ufe4f|\uffe5]/g
+const ZHCN = /(['"`])([^'"`\n]*[\u4e00-\u9fa5]+[^'"`\n]*)(['"`])/gim
 
 module.exports = class Byron {
   constructor() {
-    this.count = 0
+    this.index = 0
+    this.rootPath = ''
+    this.i18n = '@/locale' // i18n引入路径
     this.langPack = {} // 语言包对象
+    this.messages = {}
   }
 
   /**
-   * 替换文件内容
-   * @param { string } content - 文件内容
+   * 生成语言包key
    */
-  replaceContent(content) {
-    let text = []
-    if (!content) return
-    if (content.indexOf('<script>') !== -1) {
-      text = content.split('<script>')
-      text[0] = this.readVueTemplate(text[0])
-      text[1] = this.readJsScript(text[1])
-      return text.join('<script>')
+  createLangKey(match, file) {
+    if (this.messages[match]) {
+      return this.messages[match]
     }
-    return this.readJsScript(content)
+    return `${path
+      .relative(this.rootPath, file)
+      .replace(/[\\/\\\\-]/g, '_')
+      .replace(/\..*$/, '')}_${this.index++}`
   }
 
   /**
-   * 解析vue模版
-   * @param { string } content - 模版内容
-   */
-  readVueTemplate(content) {
-    let chinese = []
-    const paragraph = []
-    const arr = content.split('\n')
-    arr.forEach(e => {
-      if (/<!-- .* -->/.test(e)) {
-        return
-      }
-      const lineArr = e.split(' ').filter(item => {
-        return item !== '' && /[\u4e00-\u9fa5]+/.test(item)
-      })
-      if (lineArr.length) {
-        paragraph.push(lineArr.toString())
-      }
-    })
-    paragraph.forEach(e => {
-      chinese.push(e.replace(ZHCN, ''))
-    })
-    // 去重
-    chinese = [...new Set(chinese)]
-    chinese.forEach((e, i) => {
-      const hanzi = new RegExp(e, 'g')
-      const single = new RegExp(`'${e}'`, 'g')
-      const key = `${uuid().split('-')[0]}_${i}`
-      content = content.replace(single, `$t('${key}')`)
-      content = content.replace(hanzi, `{{$t('${key}')}}`)
-      this.langPack[key] = e
-    })
-    return content
-  }
-
-  /**
-   * 解析js脚本
-   * @param { string } content - 脚本内容
-   */
-  readJsScript(content) {
-    let chinese = []
-    const paragraph = []
-    const arr = content.split('\n')
-    arr.forEach(e => {
-      if (/\/\//.test(e) || /\/* .* *\//.test(e) || /console./.test(e)) {
-        return
-      }
-      const lineArr = e.split(' ').filter(item => {
-        return item !== '' && /[\u4e00-\u9fa5]+/.test(item)
-      })
-      if (lineArr.length) {
-        paragraph.push(lineArr.toString())
-      }
-    })
-    paragraph.forEach(e => {
-      chinese.push(e.replace(ZHCN, ''))
-    })
-    // 去重
-    chinese = [...new Set(chinese)]
-    chinese.forEach((e, i) => {
-      const single = new RegExp(`'${e}'`, 'g')
-      const double = new RegExp(`"${e}"`, 'g')
-      const key = `${uuid().split('-')[0]}_${i}`
-      content = content.replace(single, `$t('${key}')`)
-      content = content.replace(double, `$t('${key}')`)
-      this.langPack[key] = e
-    })
-    return content
-  }
-
-  /**
-   * 生成语言包
+   * 生成语言包文件
    */
   createLangPack() {
-    const name = `${uuid().split('-')[0]}_zh_cn.json`
-    const file = path.join(process.cwd(), name)
+    const file = path.join(process.cwd(), 'zh_cn.json')
     fs.writeFileSync(file, JSON.stringify(this.langPack))
-    console.log('生成语言包结束，输出文件路径：' + file)
+    console.log(`✔ 生成语言包成功，存放路径: ${file}`.green)
   }
 
   /**
-   * 文件遍历
-   * @param filePath 需要遍历的文件路径
+   * 遍历目录
+   * @param {* string} directory 需要遍历的目录
+   * @param {* string} i18n i18n引入路径
    */
-  directoryForEach(filePath) {
-    const files = fs.readdirSync(filePath)
+  directoryTraversal(directory, i18n) {
+    this.rootPath = directory
+    if (i18n) this.i18n = i18n
+    const files = fs.readdirSync(directory)
     for (let file of files) {
-      const filedir = path.join(filePath, file)
-      const fileState = fs.statSync(filedir)
-      if (fileState.isDirectory()) {
-        this.fileRecursive(filedir)
+      const dir = path.join(directory, file)
+      const state = fs.statSync(dir)
+      if (state.isDirectory()) {
+        this.recursiveTraversal(dir)
       } else {
-        this.fileStats(filedir)
+        this.readVueOrJsFile(dir)
       }
     }
     this.createLangPack()
   }
 
-  fileRecursive(filePath) {
-    const files = fs.readdirSync(filePath)
+  /**
+   * 递归遍历目录
+   * @param {* string} directory 需要遍历的目录
+   */
+  recursiveTraversal(directory) {
+    const files = fs.readdirSync(directory)
     for (let file of files) {
-      const filedir = path.join(filePath, file)
-      const fileState = fs.statSync(filedir)
-      if (fileState.isDirectory()) {
-        this.fileRecursive(filedir)
+      const dir = path.join(directory, file)
+      const state = fs.statSync(dir)
+      if (state.isDirectory()) {
+        this.recursiveTraversal(dir)
       } else {
-        this.fileStats(filedir)
+        this.readVueOrJsFile(dir)
       }
     }
   }
 
-  fileStats(filedir) {
-    const isVue = filedir.indexOf('.vue') !== -1
-    const isJS = filedir.indexOf('.js') !== -1
-    if (isVue || isJS) {
-      this.fileBuffer(filedir)
+  /**
+   * 读取vue/js文件
+   * @param {* string} file
+   */
+  readVueOrJsFile(file) {
+    const name = path.extname(file).toLowerCase()
+    if (name === '.js') {
+      this.index = 0
+      this.replaceJsFile(file)
+    }
+    if (name === '.vue') {
+      this.index = 0
+      this.replaceVueFile(file)
     }
   }
 
-  fileBuffer(filedir) {
-    const data = fs.readFileSync(filedir)
-    if (data) {
-      const content = data.toString()
-      this.fileReplace(filedir, this.replaceContent(content))
+  /**
+   * 替换js文件内容
+   * @param {* string} file
+   */
+  replaceJsFile(file) {
+    console.log(`➤ 开始替换${file}文件`.blue)
+    let content = fs.readFileSync(file, 'utf8')
+    content = `import i18n from '${this.i18n}'\n${content}`
+    const arr = content.split('\n')
+    for (let i = 0; i < arr.length; i++) {
+      const e = arr[i]
+      const patrn = /[\u4e00-\u9fa5]|[\ufe30-\uffa0]/gi
+      if (!patrn.exec(e)) {
+        continue
+      }
+      if (/\/\//.test(e) || /\/* .* *\//.test(e) || /console./.test(e)) {
+        continue
+      }
+      arr[i] = arr[i].replace(ZHCN, (_, prev, match) => {
+        match = match.trim()
+        if (prev !== '`') {
+          const key = this.createLangKey(match, file)
+          this.langPack[key] = match
+          this.messages[match] = key
+          return `i18n.t('${key}')`
+        }
+        let matchIndex = 0
+        const matchArr = []
+        match = match.replace(/(\${)([^{}]+)(})/gim, (_, prev, match) => {
+          matchArr.push(match)
+          return `{${matchIndex++}}`
+        })
+        const key = this.createLangKey(match, file)
+        this.langPack[key] = match
+        this.messages[match] = key
+        if (!matchArr.length) {
+          return `i18n.t('${key}')`
+        } else {
+          return `i18n.t('${key}', [${matchArr.toString()}])`
+        }
+      })
     }
+    content = arr.join('\n')
+    fs.writeFileSync(file, content, 'utf-8')
+    console.log(`✔ 替换${file}文件成功`.green)
   }
 
-  fileReplace(filedir, content) {
-    fs.writeFileSync(filedir, content)
-    console.log(`替换文件[${filedir}]成功！`)
+  /**
+   * 替换vue文件内容
+   * @param {* string} file
+   */
+  replaceVueFile(file) {
+    console.log(`➤ 开始替换${file}文件`.blue)
+    let content = fs.readFileSync(file, 'utf8')
+    // 替换template中的部分
+    content = content.replace(/<template(.|\n)*template>/gim, _match => {
+      const arr = _match.split('\n')
+      for (let i = 0; i < arr.length; i++) {
+        const e = arr[i]
+        const patrn = /[\u4e00-\u9fa5]|[\ufe30-\uffa0]/gi
+        if (!patrn.exec(e)) {
+          continue
+        }
+        arr[i] = arr[i].replace(
+          /(\w+='|\w+="|>|'|")([^'"<>]*[\u4e00-\u9fa5]+[^'"<>]*)(['"<])/gim,
+          (_, prev, match, after) => {
+            match = match.trim()
+            if (match.match(/{{[^{}]+}}/)) {
+              // 对于 muscache 中部分的替换
+              const matchArr = []
+              let matchIndex = 0
+              match = match.replace(/{{([^{}]+)}}/gim, (_, match) => {
+                matchArr.push(match)
+                return `{${matchIndex++}}`
+              })
+              const key = this.createLangKey(match, file)
+              this.langPack[key] = match
+              this.messages[match] = key
+              if (!matchArr.length) {
+                return `${prev}{{$t('${key}')}}${after}`
+              } else {
+                return `${prev}{{$t('${key}', [${matchArr.toString()}])}}${after}`
+              }
+            } else {
+              const key = this.createLangKey(match, file)
+              this.langPack[key] = match
+              this.messages[match] = key
+              if (prev.match(/^\w+='$/)) {
+                // 对于属性中普通文本的替换
+                return `:${prev}$t("${key}")${after}`
+              } else if (prev.match(/^\w+="$/)) {
+                // 对于属性中普通文本的替换
+                return `:${prev}$t('${key}')${after}`
+              } else if (prev === '"' || prev === "'") {
+                // 对于属性中参数形式中的替换
+                return `$t(${prev}${key}${after})`
+              } else {
+                // 对于tag标签中的普通文本替换
+                return `${prev}{{$t('${key}')}}${after}`
+              }
+            }
+          }
+        )
+      }
+      return arr.join('\n')
+    })
+    // 替换script中的部分
+    content = content.replace(/<script(.|\n)*script>/gim, _match => {
+      const arr = _match.split('\n')
+      for (let i = 0; i < arr.length; i++) {
+        const e = arr[i]
+        const patrn = /[\u4e00-\u9fa5]|[\ufe30-\uffa0]/gi
+        if (!patrn.exec(e)) {
+          continue
+        }
+        if (/\/\//.test(e) || /\/* .* *\//.test(e) || /console./.test(e)) {
+          continue
+        }
+        arr[i] = arr[i].replace(ZHCN, (_, prev, match) => {
+          match = match.trim()
+          if (prev !== '`') {
+            const key = this.createLangKey(match, file)
+            this.langPack[key] = match
+            this.messages[match] = key
+            return `this.$t('${key}')`
+          }
+          let matchIndex = 0
+          const matchArr = []
+          match = match.replace(/(\${)([^{}]+)(})/gim, (_, prev, match) => {
+            matchArr.push(match)
+            return `{${matchIndex++}}`
+          })
+          const key = this.createLangKey(match, file)
+          this.langPack[key] = match
+          this.messages[match] = key
+          if (!matchArr.length) {
+            return `this.$t('${key}')`
+          } else {
+            return `this.$t('${key}', [${matchArr.toString()}])`
+          }
+        })
+      }
+      return arr.join('\n')
+    })
+    fs.writeFileSync(file, content, 'utf-8')
+    console.log(`✔ 替换${file}文件成功`.green)
   }
 }
