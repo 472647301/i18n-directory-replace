@@ -1,6 +1,6 @@
 {
   "name": "i18n-directory-replace",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "替换.vue/.js中的中文为多语言",
   "bin": {
     "byron-i18n": "index.js"

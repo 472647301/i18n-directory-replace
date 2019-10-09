@@ -7,7 +7,7 @@ const Byron = require('./src/byron')
 const i18nReplace = new Byron()
 
 // 注册版本号与描述
-commander.version('1.0.0').description('替换.vue/.js中的中文为多语言')
+commander.version('1.0.3').description('替换.vue/.js中的中文为多语言')
 
 // 注册参数
 commander.option('-f, --file', '要替换的文件目录')

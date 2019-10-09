@@ -4,6 +4,8 @@ const colors = require('colors')
 
 // 中文正则
 const ZHCN = /(['"`])([^'"`\n]*[\u4e00-\u9fa5]+[^'"`\n]*)(['"`])/gim
+// 中文带符号正则
+const ZHCN_SYMBOL = /[\u4e00-\u9fa5\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\uff08|\uff09|\u300a|\u300b|\u3008|\u3009|\u3010|\u3011|\u300e|\u300f|\u300c|\u300d|\ufe43|\ufe44|\u3014|\u3015|\u2026|\u2014|\uff5e|\ufe4f|\uffe5]+/
 
 module.exports = class Byron {
   constructor() {
@@ -153,6 +155,7 @@ module.exports = class Byron {
         if (!patrn.exec(e)) {
           continue
         }
+        // 属性文本替换
         arr[i] = arr[i].replace(
           /(\w+='|\w+="|>|'|")([^'"<>]*[\u4e00-\u9fa5]+[^'"<>]*)(['"<])/gim,
           (_, prev, match, after) => {
@@ -193,6 +196,20 @@ module.exports = class Byron {
             }
           }
         )
+        if (patrn.exec(arr[i])) {
+          // 普通文本替换
+          const ordinary = arr[i].split('').filter(o => {
+            return o !== '' && ZHCN_SYMBOL.test(o)
+          })
+          if (ordinary && ordinary.length) {
+            const ordinaryText = ordinary.join('')
+            const key = this.createLangKey(ordinaryText, file)
+            this.langPack[key] = ordinaryText
+            this.messages[ordinaryText] = key
+            const hanzi = new RegExp(ordinaryText, 'g')
+            arr[i] = arr[i].replace(hanzi, `{{$t('${key}')}}`)
+          }
+        }
       }
       return arr.join('\n')
     })
